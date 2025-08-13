@@ -19,12 +19,16 @@ export default async function handler(req, res) {
     if (!isMatch)
       return res.status(401).json({ error: "Invalid email or password" });
 
-    // Dummy token for now — replace with JWT in production
-    const token = "some-admin-token";
+    // ✅ Use exact token from .env
+    const token = process.env.ADMIN_TOKEN;
+    if (!token)
+      return res
+        .status(500)
+        .json({ error: "Server error: ADMIN_TOKEN not set in .env" });
 
     return res.status(200).json({ success: true, token });
   } catch (err) {
-    console.error(err);
+    console.error("Login API error:", err);
     return res.status(500).json({ error: "Server error" });
   }
 }

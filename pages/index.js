@@ -165,7 +165,7 @@ export default function Home() {
 
       {/* Logo */}
       <img
-        src="/DesinerzAcademy.png"
+        src="/DesinerzAcademyDark.png"
         alt="Logo"
         className="w-100 h-auto mb-4 drop-shadow-lg"
       />
