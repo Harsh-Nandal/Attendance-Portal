@@ -20,15 +20,13 @@ export default function SuccessPage() {
     const urole = params.get("role");
     const img = params.get("imageData");
 
-    console.log("🔍 Params:", { uid, uname, urole, img });
-
     if (uid && uname && urole && img) {
       setUserId(uid);
       setName(uname);
       setRole(urole);
       setImageData(img);
     } else {
-      alert("⚠️ FRONTEND: Missing data. Please register again.");
+      alert("⚠️ Missing data. Please register again.");
       router.push("/");
     }
 
@@ -67,52 +65,59 @@ export default function SuccessPage() {
 
   if (loading) {
     return (
-      <main className="success-page">
-        <div className="card-container">
-          <p>Loading...</p>
-        </div>
+      <main className="flex items-center justify-center h-screen bg-gray-100">
+        <p className="text-lg font-medium text-gray-600">Loading...</p>
       </main>
     );
   }
 
   return (
-    <main className=" h-screen w-screen flex flex-col items-center justify-center bg-gray-100 overflow-hidden">
-      <div className="card-container">
-        <h1 className="title">🎉 Attendance Details</h1>
+    <main className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-blue-50 to-gray-100 px-4 py-6">
+      <div className="bg-white shadow-xl rounded-2xl max-w-md w-full p-6 text-center border border-gray-200">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6 flex items-center justify-center gap-2">
+          🎉 Attendance Details
+        </h1>
 
-        <div className="card">
-          {imageData && (
+        {imageData && (
+          <div className="flex justify-center mb-4">
             <img
               src={decodeURIComponent(imageData)}
               alt="Captured Face"
-              className="captured-image"
+              className="w-40 h-40 object-cover rounded-full border-4 border-blue-200 shadow-md"
             />
-          )}
-
-          <div className="info">
-            <p>
-              <span>Name:</span> {name}
-            </p>
-            <p>
-              <span>ID:</span> {userId}
-            </p>
-            <p>
-              <span>Role:</span> {role}
-            </p>
           </div>
+        )}
 
-          <button
-            className="submit-btn"
-            onClick={handleSubmit}
-            disabled={submitting}
-          >
-            {submitting ? "⏳ Submitting..." : "📥 Submit Attendance"}
-          </button>
-
-          <Link href="/" className="home-link">
-            🏠 Back to Home
-          </Link>
+        <div className="space-y-2 text-gray-700 text-left mb-6">
+          <p>
+            <span className="font-semibold">Name:</span> {name}
+          </p>
+          <p>
+            <span className="font-semibold">ID:</span> {userId}
+          </p>
+          <p>
+            <span className="font-semibold">Role:</span> {role}
+          </p>
         </div>
+
+        <button
+          onClick={handleSubmit}
+          disabled={submitting}
+          className={`w-full py-3 rounded-lg text-white font-medium shadow-md transition ${
+            submitting
+              ? "bg-gray-400 cursor-not-allowed"
+              : "bg-blue-500 hover:bg-blue-600"
+          }`}
+        >
+          {submitting ? "⏳ Submitting..." : "📥 Submit Attendance"}
+        </button>
+
+        <Link
+          href="/"
+          className="mt-4 inline-block text-blue-500 hover:underline text-sm font-medium"
+        >
+          🏠 Back to Home
+        </Link>
       </div>
     </main>
   );

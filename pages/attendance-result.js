@@ -8,7 +8,7 @@ export default function AttendanceResult() {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [captured, setCaptured] = useState("");
-  const [status, setStatus] = useState(""); // store actual status
+  const [status, setStatus] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -18,7 +18,6 @@ export default function AttendanceResult() {
     setRole(params.get("role") || "");
     setCaptured(params.get("captured") || "");
 
-    // Fetch actual status from the API
     if (uid) {
       fetch("/api/submit-attendance", {
         method: "POST",
@@ -28,7 +27,7 @@ export default function AttendanceResult() {
         .then((res) => res.json())
         .then((data) => {
           if (data.status) {
-            setStatus(data.status); // "Punched In" / "Punched Out" / "Not Punched In"
+            setStatus(data.status);
           } else {
             setStatus("Unknown");
           }
@@ -44,28 +43,60 @@ export default function AttendanceResult() {
   const time = now.toLocaleTimeString();
 
   return (
-    <main className="result-page">
-      <div className="card-container">
-        <h1 className="title">✅ Attendance Submitted</h1>
+    <main className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-green-50 to-gray-100 px-4 py-6">
+      <div className="bg-white shadow-xl rounded-2xl max-w-md w-full p-6 text-center border border-gray-200">
+        <h1 className="text-2xl font-bold text-green-600 mb-6 flex items-center justify-center gap-2">
+          ✅ Attendance Submitted
+        </h1>
 
-        <div className="card">
-          {captured && (
+        {captured && (
+          <div className="flex justify-center mb-4">
             <img
               src={decodeURIComponent(captured)}
               alt="Captured Face"
-              style={{ borderRadius: "12px", maxWidth: "100%", marginBottom: "1rem" }}
+              className="w-40 h-40 object-cover rounded-lg border-4 border-green-200 shadow-md"
             />
-          )}
-          <div className="info">
-            <p><strong>Name:</strong> {name}</p>
-            <p><strong>ID:</strong> {userId}</p>
-            <p><strong>Role:</strong> {role}</p>
-            <p><strong>Date:</strong> {date}</p>
-            <p><strong>Time:</strong> {time}</p>
-            <p><strong>Status:</strong> {status}</p>
           </div>
+        )}
+
+        <div className="space-y-2 text-gray-700 text-left mb-6">
+          <p>
+            <span className="font-semibold">Name:</span> {name}
+          </p>
+          <p>
+            <span className="font-semibold">ID:</span> {userId}
+          </p>
+          <p>
+            <span className="font-semibold">Role:</span> {role}
+          </p>
+          <p>
+            <span className="font-semibold">Date:</span> {date}
+          </p>
+          <p>
+            <span className="font-semibold">Time:</span> {time}
+          </p>
+          <p>
+            <span className="font-semibold">Status:</span>{" "}
+            <span
+              className={`px-2 py-1 rounded-full text-sm font-medium ${
+                status.includes("In")
+                  ? "bg-green-100 text-green-700"
+                  : status.includes("Out")
+                  ? "bg-yellow-100 text-yellow-700"
+                  : "bg-gray-100 text-gray-700"
+              }`}
+            >
+              {status}
+            </span>
+          </p>
         </div>
-        <Link href={".."}>Home</Link>
+
+        <Link
+          href="/"
+          className="mt-4 inline-block w-full py-3 rounded-lg text-white font-medium bg-green-500 hover:bg-green-600 transition shadow-md"
+        >
+          🏠 Back to Home
+        </Link>
       </div>
     </main>
   );
