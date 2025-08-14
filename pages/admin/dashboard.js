@@ -9,7 +9,15 @@ import DashboardTabs from "../../components/DashboardTabs";
 import AttendanceTable from "../../components/AttendanceTable";
 
 export default function AdminDashboard() {
-  const [data, setData] = useState({ daily: [], weekly: [], monthly: [], absentDaily: [] });
+  const [data, setData] = useState({
+    daily: [],
+    weekly: [],
+    monthly: [],
+    absentDaily: [],
+    absentWeekly: [],
+    absentMonthly: [],
+    allStudents: []
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [view, setView] = useState("daily");
@@ -18,7 +26,6 @@ export default function AdminDashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (typeof window === "undefined") return;
     const token = localStorage.getItem("adminToken");
     if (!token) router.replace("/admin/login");
     else setAuthChecked(true);
@@ -30,31 +37,14 @@ export default function AdminDashboard() {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
-
       try {
         const token = localStorage.getItem("adminToken");
-        if (!token) throw new Error("Unauthorized: No token found");
-
         const res = await fetch("/api/admin/attendance", {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!res.ok) {
-          if (res.status === 401) {
-            localStorage.removeItem("adminToken");
-            router.replace("/admin/login");
-            return;
-          }
-          throw new Error(`Failed to fetch: ${res.statusText}`);
-        }
-
+        if (!res.ok) throw new Error(`Failed to fetch: ${res.statusText}`);
         const json = await res.json();
-        setData({
-          daily: json.daily || [],
-          weekly: json.weekly || [],
-          monthly: json.monthly || [],
-          absentDaily: json.absentDaily || [],
-        });
+        setData(json);
       } catch (err) {
         setError(err.message || "Unknown error");
       } finally {
@@ -67,7 +57,7 @@ export default function AdminDashboard() {
 
   if (!authChecked || loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen bg-gradient-to-br from-gray-100 via-gray-200 to-gray-300">
+      <div className="flex justify-center items-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-4 border-gray-800"></div>
       </div>
     );
@@ -88,7 +78,8 @@ export default function AdminDashboard() {
     );
   }
 
-  const attendanceList = showAbsent ? data.absentDaily : data[view] || [];
+  const capitalizedView = view.charAt(0).toUpperCase() + view.slice(1);
+  const attendanceList = showAbsent ? data[`absent${capitalizedView}`] : data[view] || [];
 
   return (
     <div className="flex min-h-screen">
