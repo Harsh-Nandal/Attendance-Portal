@@ -6,10 +6,13 @@ export default function AdminHeader({ showAbsent }) {
   const router = useRouter();
 
   return (
-    <header className="bg-gradient-to-r from-gray-800 to-gray-700 shadow-sm p-4 flex justify-between items-center border-b border-gray-700">
-      <h1 className="text-xl font-semibold capitalize">
-        {showAbsent ? "Absent Students Today" : "Dashboard"}
+    <header className="fixed top-0 left-64 right-0 z-50 bg-gradient-to-r from-gray-800 to-gray-700 shadow-sm p-4 flex justify-between items-center border-b border-gray-700">
+      {/* ✅ Title */}
+      <h1 className="text-xl font-semibold capitalize text-white">
+        {showAbsent ? showAbsent : "Dashboard"}
       </h1>
+
+      {/* ✅ Logout Button */}
       <button
         onClick={() => {
           localStorage.removeItem("adminToken");

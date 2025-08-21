@@ -19,27 +19,55 @@ export default function AttendanceTable({ attendanceList }) {
             <tbody>
               {attendanceList.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="text-center p-6 text-gray-500 italic">
+                  <td
+                    colSpan="5"
+                    className="text-center p-6 text-gray-500 italic"
+                  >
                     No attendance records found.
                   </td>
                 </tr>
               ) : (
-                attendanceList.map((entry, index) => (
-                  <tr key={index} className="border-b hover:bg-gray-200 transition">
-                    <td className="p-4">
-                      <Link
-                        href={`/admin/student/${entry.userId}`}
-                        className="text-blue-600 hover:underline"
-                      >
-                        {entry.name || "Unknown"}
-                      </Link>
-                    </td>
-                    <td className="p-4">{entry.role || "-"}</td>
-                    <td className="p-4">{entry.date ? new Date(entry.date).toLocaleDateString() : "-"}</td>
-                    <td className="p-4">{entry.punchIn || "-"}</td>
-                    <td className="p-4">{entry.punchOut || "-"}</td>
-                  </tr>
-                ))
+                attendanceList.map((entry, index) => {
+                  const isAbsent =
+                    !entry.punchIn && !entry.punchOut; // condition for absent
+
+                  return (
+                    <tr
+                      key={index}
+                      className="border-b hover:bg-gray-200 transition"
+                    >
+                      <td className="p-4">
+                        <Link
+                          href={`/admin/student/${entry.userId}`}
+                          className="text-blue-600 hover:underline"
+                        >
+                          {entry.name || "Unknown"}
+                        </Link>
+                      </td>
+                      <td className="p-4">{entry.role || "-"}</td>
+
+                      {/* Show date for both present & absent */}
+                      <td className="p-4">
+                        {entry.date
+                          ? new Date(entry.date).toLocaleDateString()
+                          : new Date().toLocaleDateString()}
+                      </td>
+
+                      {/* Show Punch In / Out only if present */}
+                      {isAbsent ? (
+                        <>
+                          <td className="p-4 text-gray-400 italic">Absent</td>
+                          <td className="p-4 text-gray-400 italic">Absent</td>
+                        </>
+                      ) : (
+                        <>
+                          <td className="p-4">{entry.punchIn || "-"}</td>
+                          <td className="p-4">{entry.punchOut || "-"}</td>
+                        </>
+                      )}
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

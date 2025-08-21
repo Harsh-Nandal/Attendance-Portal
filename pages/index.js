@@ -48,7 +48,10 @@ export default function Home() {
     }
 
     return () => {
-      window.removeEventListener("beforeinstallprompt", handleBeforeInstallPrompt);
+      window.removeEventListener(
+        "beforeinstallprompt",
+        handleBeforeInstallPrompt
+      );
       window.removeEventListener("appinstalled", handleAppInstalled);
     };
   }, []);
@@ -79,7 +82,10 @@ export default function Home() {
     setLoading(true);
     try {
       const detection = await faceapi
-        .detectSingleFace(videoRef.current, new faceapi.TinyFaceDetectorOptions())
+        .detectSingleFace(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions()
+        )
         .withFaceLandmarks()
         .withFaceDescriptor();
 
@@ -131,7 +137,6 @@ export default function Home() {
 
   return (
     <main className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-gray-200 p-6 text-center relative">
-      
       {/* Popup */}
       {showPopup && (
         <div className="fixed inset-0 flex items-center justify-center bg-black/50 z-50">
@@ -170,15 +175,25 @@ export default function Home() {
         className="w-100 h-auto mb-4 drop-shadow-lg"
       />
 
-      {/* Camera Feed */}
-      <div className="w-64 h-64 rounded-full overflow-hidden border-4 border-blue-500 shadow-lg mb-4">
+      {/* Camera Feed with Loader */}
+      <div className="relative w-64 h-64 rounded-full overflow-hidden border-4 border-blue-500 shadow-lg mb-4 flex items-center justify-center">
         <video
           ref={videoRef}
           autoPlay
           playsInline
           muted
-          className="w-full h-full object-cover"
+          className="w-full h-full object-cover rounded-full"
         />
+
+        {/* Loader */}
+        {loading && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="relative w-72 h-72 flex items-center justify-center">
+              {/* White pulsing border circle */}
+              <span className="absolute w-64 h-64 rounded-full border-4 border-white animate-border-pulse"></span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Heading */}
