@@ -5,6 +5,8 @@ import { useRouter } from "next/router";
 import jsPDF from "jspdf";
 import "jspdf-autotable";
 import AdminSidebar from "../../../components/AdminSidebar"; // ✅ Import Sidebar
+import AdminHeader from "../../../components/AdminHeader"; // ✅ Import Sidebar
+
 
 export default function StudentPage() {
   const router = useRouter();
