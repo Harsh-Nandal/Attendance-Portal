@@ -6,7 +6,10 @@ import jsPDF from "jspdf";
 import "jspdf-autotable";
 import AdminSidebar from "../../../components/AdminSidebar"; // ✅ Import Sidebar
 import AdminHeader from "../../../components/AdminHeader"; // ✅ Import Sidebar
+<<<<<<< HEAD
 
+=======
+>>>>>>> 12f5a82 (updating the index.js code so that it can detect perfectly and quickly)
 
 export default function StudentPage() {
   const router = useRouter();

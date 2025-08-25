@@ -15,24 +15,26 @@ export default function Home() {
 
   const handleClose = () => setShowPopup(false);
 
+  // Load face-api models
   useEffect(() => {
     const loadModels = async () => {
       const MODEL_URL = "/models";
       await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
       await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
       await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
+      console.log("✅ Face-api models loaded");
     };
     loadModels();
   }, []);
 
+  // Start video stream
   useEffect(() => {
     navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      if (videoRef.current) videoRef.current.srcObject = stream;
     });
   }, []);
 
+  // PWA install prompt
   useEffect(() => {
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -81,15 +83,33 @@ export default function Home() {
   const handleAttendance = async () => {
     setLoading(true);
     try {
+      // Faster detection options
+      const options = new faceapi.TinyFaceDetectorOptions({
+        inputSize: 160, // smaller input = faster detection
+        scoreThreshold: 0.5,
+      });
+
       const detection = await faceapi
-        .detectSingleFace(
-          videoRef.current,
-          new faceapi.TinyFaceDetectorOptions()
-        )
+        .detectSingleFace(videoRef.current, options)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
       if (!detection) {
+        console.warn("⚠️ No face detected");
+        setShowPopup(true);
+        setLoading(false);
+        return;
+      }
+
+      // Debug info
+      console.log("🔹 Face detected!");
+      console.log("Detection score:", detection.detection.score);
+      console.log("Bounding box:", detection.detection.box);
+      console.log("Descriptor length:", detection.descriptor.length);
+
+      // Optional: minimum confidence check
+      if (detection.detection.score < 0.6) {
+        console.warn("⚠️ Face detected but confidence too low");
         setShowPopup(true);
         setLoading(false);
         return;
@@ -105,6 +125,7 @@ export default function Home() {
       });
 
       const result = await res.json();
+      console.log("💻 Verification result:", result);
 
       if (result.success && result.user) {
         const { name, role, userId, imageUrl } = result.user;
@@ -125,6 +146,7 @@ export default function Home() {
           )}&imageData=${encodeURIComponent(imageData)}`
         );
       } else {
+        console.warn("⚠️ User not recognized");
         setShowPopup(true);
       }
     } catch (err) {
@@ -134,6 +156,15 @@ export default function Home() {
       setLoading(false);
     }
   };
+
+  // Optional: auto-detect every 2 seconds for faster attendance
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!loading) handleAttendance();
+    }, 2000); // detect every 2s
+
+    return () => clearInterval(interval);
+  }, [loading]);
 
   return (
     <main className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-gray-200 p-6 text-center relative">
@@ -189,19 +220,16 @@ export default function Home() {
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative w-72 h-72 flex items-center justify-center">
-              {/* White pulsing border circle */}
               <span className="absolute w-64 h-64 rounded-full border-4 border-white animate-border-pulse"></span>
             </div>
           </div>
         )}
       </div>
 
-      {/* Heading */}
       <h1 className="text-3xl font-extrabold text-gray-800 mb-6 leading-snug">
         Welcome <br /> to <br /> MDCI
       </h1>
 
-      {/* Attendance Button */}
       <button
         onClick={handleAttendance}
         disabled={loading}
@@ -210,7 +238,6 @@ export default function Home() {
         {loading ? "Detecting..." : "Mark Your Daily Attendance"}
       </button>
 
-      {/* Install App Button */}
       {!isInstalled && installPrompt && (
         <button
           onClick={handleInstall}

@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     const users = await User.find({});
 
     let bestMatch = null;
-    let minDistance = 0.6; // You can adjust this threshold
+    let minDistance = 0.85; // You can adjust this threshold
 
     users.forEach((user) => {
       if (user.faceDescriptor && user.faceDescriptor.length === descriptor.length) {
