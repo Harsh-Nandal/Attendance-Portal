@@ -10,28 +10,70 @@ export default function Home() {
   const [isInstalled, setIsInstalled] = useState(false);
   const [showPopup, setShowPopup] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [modelsLoaded, setModelsLoaded] = useState(false);
+  const [videoReady, setVideoReady] = useState(false);
   const videoRef = useRef(null);
+  const detectTimer = useRef(null);
+  const runningDetection = useRef(false);
   const router = useRouter();
 
   const handleClose = () => setShowPopup(false);
 
-  // Load face-api models
+  // Load face-api models (once)
   useEffect(() => {
-    const loadModels = async () => {
+    let cancelled = false;
+    (async () => {
       const MODEL_URL = "/models";
-      await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
-      await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-      console.log("✅ Face-api models loaded");
+      await Promise.all([
+        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+        faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL),
+        faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+      ]);
+      if (!cancelled) {
+        setModelsLoaded(true);
+        console.log("✅ Face-api models loaded");
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-    loadModels();
   }, []);
 
   // Start video stream
   useEffect(() => {
-    navigator.mediaDevices.getUserMedia({ video: true }).then((stream) => {
-      if (videoRef.current) videoRef.current.srcObject = stream;
-    });
+    let currentStream;
+    (async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: "user",
+            width: { ideal: 640 },
+            height: { ideal: 480 },
+            frameRate: { ideal: 30, max: 30 },
+          },
+          audio: false,
+        });
+        currentStream = stream;
+        if (videoRef.current) {
+          videoRef.current.srcObject = stream;
+          videoRef.current.onloadedmetadata = () => {
+            setVideoReady(true);
+            videoRef.current?.play?.();
+          };
+        }
+      } catch (err) {
+        console.error("🎥 Camera error:", err);
+        alert("Could not access camera. Please allow camera permissions.");
+      }
+    })();
+
+    // Cleanup camera on unmount
+    return () => {
+      if (detectTimer.current) clearInterval(detectTimer.current);
+      if (currentStream) {
+        currentStream.getTracks().forEach((t) => t.stop());
+      }
+    };
   }, []);
 
   // PWA install prompt
@@ -73,80 +115,149 @@ export default function Home() {
   const captureImage = () => {
     const canvas = document.createElement("canvas");
     const video = videoRef.current;
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
     const ctx = canvas.getContext("2d");
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL("image/jpeg");
+    return canvas.toDataURL("image/jpeg", 0.9);
   };
 
-  const handleAttendance = async () => {
-    setLoading(true);
-    try {
-      // Faster detection options
-      const options = new faceapi.TinyFaceDetectorOptions({
-        inputSize: 160, // smaller input = faster detection
-        scoreThreshold: 0.5,
-      });
+  // Average N descriptors across a short time to stabilize identity
+  const getAveragedDescriptor = async (samples = 3, gapMs = 150) => {
+    const options = new faceapi.TinyFaceDetectorOptions({
+      inputSize: 224, // better accuracy than 160
+      scoreThreshold: 0.6,
+    });
 
-      const detection = await faceapi
+    const vecs = [];
+
+    for (let i = 0; i < samples; i++) {
+      const det = await faceapi
         .detectSingleFace(videoRef.current, options)
         .withFaceLandmarks()
         .withFaceDescriptor();
 
-      if (!detection) {
+      if (!det) return { ok: false, reason: "no-face" };
+
+      // Require strong detection confidence
+      if (det.detection.score < 0.75) {
+        return { ok: false, reason: "low-confidence" };
+      }
+
+      // Require sufficiently large face to avoid background/mini faces
+      const box = det.detection.box;
+      const minSize = Math.min(
+        videoRef.current?.videoWidth || 640,
+        videoRef.current?.videoHeight || 480
+      );
+      if (box.width < minSize * 0.25 || box.height < minSize * 0.25) {
+        return { ok: false, reason: "face-too-small" };
+      }
+
+      vecs.push(det.descriptor);
+
+      if (i < samples - 1) {
+        await new Promise((r) => setTimeout(r, gapMs));
+      }
+    }
+
+    // average the vectors
+    const len = vecs[0].length;
+    const avg = new Float32Array(len).fill(0);
+    vecs.forEach((v) => {
+      for (let i = 0; i < len; i++) avg[i] += v[i];
+    });
+    for (let i = 0; i < len; i++) avg[i] /= samples;
+
+    return { ok: true, descriptor: Array.from(avg) };
+  };
+
+  const handleAttendance = async () => {
+    // prevent overlapping runs
+    if (runningDetection.current) return;
+    runningDetection.current = true;
+    setLoading(true);
+
+    try {
+      if (!modelsLoaded || !videoReady) {
+        console.warn("Models/video not ready yet");
+        return;
+      }
+
+      // quick check: exactly one face in frame
+      const multi = await faceapi
+        .detectAllFaces(
+          videoRef.current,
+          new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.6 })
+        )
+        .withFaceLandmarks();
+
+      if (!multi || multi.length === 0) {
         console.warn("⚠️ No face detected");
         setShowPopup(true);
-        setLoading(false);
         return;
       }
-
-      // Debug info
-      console.log("🔹 Face detected!");
-      console.log("Detection score:", detection.detection.score);
-      console.log("Bounding box:", detection.detection.box);
-      console.log("Descriptor length:", detection.descriptor.length);
-
-      // Optional: minimum confidence check
-      if (detection.detection.score < 0.6) {
-        console.warn("⚠️ Face detected but confidence too low");
+      if (multi.length > 1) {
+        console.warn("⚠️ Multiple faces detected — rejecting for safety");
         setShowPopup(true);
-        setLoading(false);
         return;
       }
 
-      const descriptor = Array.from(detection.descriptor);
+      // Stabilize: average 3 descriptors
+      const stab = await getAveragedDescriptor(3, 150);
+      if (!stab.ok) {
+        console.warn("Descriptor stabilization failed:", stab.reason);
+        setShowPopup(true);
+        return;
+      }
+
+      const descriptor = stab.descriptor;
       const imageData = captureImage();
 
       const res = await fetch("/api/verify-face", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        // NOTE: send the averaged descriptor; server should return { success, user, distance }
         body: JSON.stringify({ descriptor }),
       });
 
       const result = await res.json();
       console.log("💻 Verification result:", result);
 
-      if (result.success && result.user) {
+      // Enforce a strict distance threshold on the client too (extra guard)
+      const serverDistance =
+        typeof result?.distance === "number"
+          ? result.distance
+          : typeof result?.matchDistance === "number"
+          ? result.matchDistance
+          : null;
+
+      const distanceOk = serverDistance === null ? true : serverDistance < 0.45;
+
+      if (result.success && result.user && distanceOk) {
         const { name, role, userId, imageUrl } = result.user;
 
         localStorage.setItem("uid", userId);
 
-        await fetch("/api/send-telegram", {
+        // Optional: notify Telegram (ignore errors)
+        fetch("/api/send-telegram", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ name, role, userId, imageData }),
-        });
+        }).catch(() => {});
 
+        // Navigate only on confident match
         router.push(
           `/success?name=${encodeURIComponent(name)}&role=${encodeURIComponent(
             role
           )}&userId=${encodeURIComponent(userId)}&image=${encodeURIComponent(
-            imageUrl
+            imageUrl || ""
           )}&imageData=${encodeURIComponent(imageData)}`
         );
       } else {
-        console.warn("⚠️ User not recognized");
+        console.warn("⚠️ User not recognized or distance too high", {
+          serverDistance,
+        });
         setShowPopup(true);
       }
     } catch (err) {
@@ -154,17 +265,25 @@ export default function Home() {
       alert("Error occurred during attendance.");
     } finally {
       setLoading(false);
+      runningDetection.current = false;
     }
   };
 
-  // Optional: auto-detect every 2 seconds for faster attendance
+  // Auto-detect every 2.5s but never overlap; pause when popup is open
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (!loading) handleAttendance();
-    }, 2000); // detect every 2s
+    if (!modelsLoaded || !videoReady) return;
+    if (detectTimer.current) clearInterval(detectTimer.current);
 
-    return () => clearInterval(interval);
-  }, [loading]);
+    detectTimer.current = setInterval(() => {
+      if (!loading && !showPopup && document.visibilityState === "visible") {
+        handleAttendance();
+      }
+    }, 2500);
+
+    return () => {
+      if (detectTimer.current) clearInterval(detectTimer.current);
+    };
+  }, [modelsLoaded, videoReady, loading, showPopup]);
 
   return (
     <main className="h-screen w-screen flex flex-col items-center justify-center bg-gradient-to-b from-gray-50 to-gray-200 p-6 text-center relative">
@@ -180,7 +299,9 @@ export default function Home() {
             </button>
             <h2 className="text-xl font-bold text-gray-800 mb-2">Welcome!</h2>
             <p className="text-gray-600 mb-4">
-              You were not detected <br /> Please choose your option:
+              Not recognized with high confidence.
+              <br />
+              Please choose your option:
             </p>
             <div className="flex gap-3">
               <Link href="/newStudent" className="flex-1">
@@ -215,8 +336,6 @@ export default function Home() {
           muted
           className="w-full h-full object-cover rounded-full"
         />
-
-        {/* Loader */}
         {loading && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="relative w-72 h-72 flex items-center justify-center">
@@ -232,7 +351,7 @@ export default function Home() {
 
       <button
         onClick={handleAttendance}
-        disabled={loading}
+        disabled={loading || !modelsLoaded || !videoReady}
         className="bg-green-600 text-white px-6 py-3 rounded-lg text-lg shadow hover:bg-green-700 transition disabled:bg-green-400 mb-4"
       >
         {loading ? "Detecting..." : "Mark Your Daily Attendance"}
